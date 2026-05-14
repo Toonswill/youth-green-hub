@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 import { Leaf, Mail, Lock, User } from 'lucide-react'
 
 export default function SignupPage() {
@@ -13,6 +15,8 @@ export default function SignupPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const router = useRouter()
+  const supabase = createClient()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -25,7 +29,6 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       return
@@ -37,20 +40,42 @@ export default function SignupPage() {
     }
 
     setLoading(true)
-    
-    // Demo signup - store user info in localStorage
-    setTimeout(() => {
-      localStorage.setItem('isLoggedIn', 'true')
-      localStorage.setItem('userName', formData.fullName)
-      localStorage.setItem('userEmail', formData.email)
-      window.location.href = '/dashboard'
-    }, 1000)
+    setError('')
+
+    // Sign up with Supabase
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          full_name: formData.fullName,
+        },
+      },
+    })
+
+    if (error) {
+      setError(error.message)
+    } else {
+      // Create profile in profiles table
+      if (data.user) {
+        await supabase.from('profiles').insert({
+          id: data.user.id,
+          email: formData.email,
+          full_name: formData.fullName,
+          role: 'member',
+        })
+      }
+      
+      // Show success message and redirect to login
+      alert('Account created! Please check your email to confirm your account.')
+      router.push('/login')
+    }
+    setLoading(false)
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-        {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <Leaf className="w-16 h-16 text-emerald-600" />
@@ -59,14 +84,6 @@ export default function SignupPage() {
           <p className="text-gray-600 mt-2">Create your account to get started</p>
         </div>
 
-        {/* Demo Notice */}
-        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800 text-center">
-            🔧 Demo Mode: Create any account to test the platform
-          </p>
-        </div>
-
-        {/* Signup Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -140,7 +157,6 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700 text-center">{error}</p>
@@ -156,20 +172,12 @@ export default function SignupPage() {
           </button>
         </form>
 
-        {/* Login Link */}
         <p className="text-center text-gray-600 mt-6">
           Already have an account?{' '}
           <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-semibold">
             Sign In
           </Link>
         </p>
-
-        {/* Info Message */}
-        <div className="mt-6 p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-500 text-center">
-            By signing up, you agree to our Terms of Service and Privacy Policy
-          </p>
-        </div>
       </div>
     </div>
   )

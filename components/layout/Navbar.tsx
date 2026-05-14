@@ -2,25 +2,30 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { Menu, X, Leaf, LogOut } from 'lucide-react'
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [userName, setUserName] = useState('')
+  const [user, setUser] = useState<any>(null)
+  const supabase = createClient()
 
   useEffect(() => {
-    // Check if user is logged in
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true'
-    const name = localStorage.getItem('userName') || ''
-    setIsLoggedIn(loggedIn)
-    setUserName(name)
-  }, [])
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
 
-  const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn')
-    localStorage.removeItem('userName')
-    localStorage.removeItem('userEmail')
+    return () => subscription.unsubscribe()
+  }, [supabase])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
     window.location.href = '/'
   }
 
@@ -40,12 +45,13 @@ export function Navbar() {
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-6">
             <Link href="/policies" className="text-gray-700 hover:text-emerald-600 transition">Policy Library</Link>
-            <Link href="/compare" className="text-gray-700 hover:text-emerald-600 transition">Compare</Link>
+            <Link href="/compare" className="text-gray-700 hover:text-emerald-600 transition">Compare Policies</Link>
             <Link href="/knowledge" className="text-gray-700 hover:text-emerald-600 transition">Knowledge Hub</Link>
             <Link href="/upload" className="text-gray-700 hover:text-emerald-600 transition">Upload Brief</Link>
-            {isLoggedIn ? (
+            <Link href="/admin/policies" className="text-gray-700 hover:text-emerald-600 transition">Admin</Link>
+            {user ? (
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600">Hi, {userName}</span>
+                <span className="text-sm text-gray-700">Hi, {user.user_metadata?.full_name || user.email?.split('@')[0]}</span>
                 <Link href="/dashboard" className="text-gray-700 hover:text-emerald-600 transition">
                   Dashboard
                 </Link>
@@ -54,13 +60,15 @@ export function Navbar() {
                 </button>
               </div>
             ) : (
-              <Link href="/login" className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition" style={{ color: 'white' }}>Sign In</Link>
+              <Link href="/login" className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition">
+                Sign In
+              </Link>
             )}
           </div>
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center">
-            <button onClick={() => setIsOpen(!isOpen)}>
+            <button onClick={() => setIsOpen(!isOpen)} className="text-gray-700">
               {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
@@ -71,10 +79,10 @@ export function Navbar() {
           <div className="md:hidden py-4 border-t">
             <div className="flex flex-col gap-3">
               <Link href="/policies" className="text-gray-700 hover:text-emerald-600 py-2">Policy Library</Link>
+              <Link href="/compare" className="text-gray-700 hover:text-emerald-600 py-2">Compare Policies</Link>
               <Link href="/knowledge" className="text-gray-700 hover:text-emerald-600 py-2">Knowledge Hub</Link>
-              <Link href="/compare" className="text-gray-700 hover:text-emerald-600 py-2">Compare</Link>
               <Link href="/upload" className="text-gray-700 hover:text-emerald-600 py-2">Upload Brief</Link>
-              {isLoggedIn ? (
+              {user ? (
                 <>
                   <Link href="/dashboard" className="text-gray-700 hover:text-emerald-600 py-2">Dashboard</Link>
                   <button onClick={handleLogout} className="text-red-600 py-2 text-left">Sign Out</button>
