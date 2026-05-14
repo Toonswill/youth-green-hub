@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Leaf, Mail, Lock } from 'lucide-react'
+import { Shield, Mail, Lock } from 'lucide-react'
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,7 +18,7 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -27,7 +26,19 @@ export default function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      router.push('/user/dashboard')
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile?.role === 'admin') {
+        router.push('/admin/dashboard')
+      } else {
+        setError('Access denied. Admin privileges required.')
+        await supabase.auth.signOut()
+      }
     }
     setLoading(false)
   }
@@ -36,9 +47,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
-          <Leaf className="w-16 h-16 text-emerald-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
+          <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-8 h-8 text-emerald-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
+          <p className="text-gray-600 mt-2">Sign in to manage the platform</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -52,7 +65,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                placeholder="you@example.com"
+                placeholder="admin@example.com"
               />
             </div>
           </div>
@@ -82,19 +95,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-emerald-600 text-white py-2 rounded-lg font-semibold hover:bg-emerald-700"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Admin Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-gray-600 mt-6">
-          Don't have an account?{' '}
-          <Link href="/signup" className="text-emerald-600 hover:text-emerald-700">
-            Sign up
-          </Link>
-        </p>
-
-        <p className="text-center text-gray-400 text-sm mt-4">
-          Admin? <Link href="/admin/login" className="text-emerald-600">Go to Admin Portal</Link>
+        <p className="text-center text-gray-500 text-sm mt-6">
+          Regular users go to{' '}
+          <a href="/login" className="text-emerald-600">Sign In</a>
         </p>
       </div>
     </div>
